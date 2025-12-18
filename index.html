@@ -1,133 +1,286 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="de">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Etiketten 192 × 61 mm</title>
+
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 
 <style>
-body{font-family:Arial;background:#f2f2f2;margin:16px}
-button{padding:10px 16px;border:0;border-radius:6px;color:#fff;cursor:pointer}
+body{
+  font-family: Arial, sans-serif;
+  background:#f2f2f2;
+  margin:16px;
+}
+
+.topbar{
+  max-width:1200px;
+  margin:0 auto 14px;
+  display:flex;
+  gap:10px;
+}
+
+button{
+  padding:10px 16px;
+  font-size:15px;
+  border:0;
+  border-radius:6px;
+  color:#fff;
+  cursor:pointer;
+}
 .reset{background:#c9302c}
 .pdf{background:#0275d8}
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
-.card{background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px}
-.preview{width:192mm;height:61mm;border:1px dashed #999;margin-bottom:6px}
-canvas{width:192mm;height:61mm}
-textarea,input{width:100%;margin-top:6px;padding:6px;border-radius:6px;border:1px solid #ccc}
-textarea{white-space:pre}
+
+.wrapper{
+  max-width:1200px;
+  margin:0 auto;
+  background:#fff;
+  padding:14px;
+  border-radius:10px;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:18px;
+}
+@media(max-width:900px){
+  .grid{grid-template-columns:1fr}
+}
+
+.card{
+  border:1px solid #ddd;
+  border-radius:10px;
+  padding:10px;
+}
+
+.cardHeader{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:6px;
+}
+
+.preview{
+  width:192mm;
+  height:61mm;
+  border:1px dashed #999;
+  margin-bottom:6px;
+  background:#fff;
+}
+
+canvas{
+  width:192mm;
+  height:61mm;
+}
+
+input, textarea{
+  width:100%;
+  font-size:14px;
+  padding:6px;
+  border-radius:6px;
+  border:1px solid #ccc;
+  box-sizing:border-box;
+  margin-top:6px;
+}
+
+textarea{
+  min-height:110px;
+  resize:vertical;
+  white-space:pre;
+}
 </style>
 </head>
 
 <body>
 
-<button class="reset" onclick="resetAll()">Reset</button>
-<button class="pdf" onclick="makePDF()">PDF erstellen</button>
+<div class="topbar">
+  <button class="reset" onclick="resetAll()">Reset</button>
+  <button class="pdf" onclick="makePDF()">PDF erstellen</button>
+</div>
 
-<div class="grid" id="grid"></div>
+<div class="wrapper">
+  <div class="grid" id="grid"></div>
+</div>
 
 <script>
-const LABELS=4;
-const grid=document.getElementById("grid");
+const LABELS = 4;                 // Top Stick: 4 Etiketten pro Blatt
+const grid = document.getElementById("grid");
 
+// UI
 for(let i=1;i<=LABELS;i++){
-  grid.innerHTML+=`
-  <div class="card">
-    <b>ETIKETT ${i}</b>
-    <label style="float:right">Drucken <input id="p${i}" type="checkbox" checked></label>
-    <div class="preview"><canvas id="c${i}" width="1152" height="366"></canvas></div>
-    <textarea id="h${i}" placeholder="Überschrift (max. 3 Zeilen, ENTER)" oninput="update(${i})"></textarea>
-    <textarea id="t${i}" placeholder="Freitext" oninput="update(${i})"></textarea>
-    <input id="n${i}" placeholder="Nummer unten" oninput="update(${i})">
-  </div>`;
+  grid.insertAdjacentHTML("beforeend",`
+    <div class="card">
+      <div class="cardHeader">
+        <strong>ETIKETT ${i}</strong>
+        <label>Drucken <input type="checkbox" id="p${i}" checked></label>
+      </div>
+
+      <div class="preview">
+        <canvas id="c${i}" width="1152" height="366"></canvas>
+      </div>
+
+      <textarea id="h${i}" placeholder="Überschrift (max. 3 Zeilen, ENTER)" oninput="update(${i})"></textarea>
+      <textarea id="t${i}" placeholder="Freitext – Linien erscheinen im Druck" oninput="update(${i})"></textarea>
+      <input id="n${i}" placeholder="Nummer unten (z. B. 01)" oninput="update(${i})">
+    </div>
+  `);
+
   update(i);
 }
 
 function resetAll(){
   for(let i=1;i<=LABELS;i++){
-    ["h","t","n"].forEach(x=>document.getElementById(x+i).value="");
+    document.getElementById("h"+i).value="";
+    document.getElementById("t"+i).value="";
+    document.getElementById("n"+i).value="";
     document.getElementById("p"+i).checked=false;
     update(i);
   }
 }
 
 function update(i){
-  const ctx=document.getElementById("c"+i).getContext("2d");
-  drawLabel(ctx,
+  const canvas = document.getElementById("c"+i);
+  const ctx = canvas.getContext("2d");
+
+  drawLabel(
+    ctx,
     document.getElementById("h"+i).value,
     document.getElementById("t"+i).value,
     document.getElementById("n"+i).value
   );
 }
 
-function drawLabel(ctx,header,text,number){
-  ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+/* ===== Helper: Text automatisch kleiner machen, damit er reinpasst ===== */
+function drawFitText(ctx, text, x, y, maxWidth, fontBasePx, fontFamily, bold=false){
+  let size = fontBasePx;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  while(size >= 10){
+    ctx.font = `${bold ? "bold " : ""}${size}px ${fontFamily}`;
+    if(ctx.measureText(text).width <= maxWidth) break;
+    size--;
+  }
+  ctx.fillText(text, x, y);
+}
+
+/* ================= ZEICHNEN (OHNE ROTATION!) ================= */
+function drawLabel(ctx, header, text, number){
+  const W = ctx.canvas.width;
+  const H = ctx.canvas.height;
+
+  ctx.clearRect(0,0,W,H);
   ctx.fillStyle="#fff";
-  ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  ctx.fillRect(0,0,W,H);
 
-  ctx.save();
-  ctx.translate(0,ctx.canvas.height);
-  ctx.rotate(-Math.PI/2);
-
-  /* 🔥 WICHTIGER FIX 🔥 */
   ctx.fillStyle="#000";
   ctx.strokeStyle="#000";
+  ctx.lineWidth = 2;
 
-  const W=ctx.canvas.height;
-  const H=ctx.canvas.width;
-  let y=10;
+  const padL = 20;
+  const padR = 20;
+  const padT = 18;
+  const padB = 18;
 
-  ctx.font="bold 28px Arial";
-  header.split("\n").slice(0,3).forEach(line=>{
-    ctx.fillText(line,14,y);
-    y+=32;
-  });
+  const numberArea = 34;     // Platz unten für Nummer
+  const headerMaxLines = 3;
+  const headerLineH = 30;
+  const headerFont = 28;
 
+  const lineHeight = 34;
+  const lineGap = 6;
+
+  let y = padT;
+
+  /* ===== ÜBERSCHRIFT max 3 Zeilen (ENTER) ===== */
+  const hLines = (header || "").split("\n").slice(0, headerMaxLines);
+  for(let i=0;i<hLines.length;i++){
+    const line = hLines[i].trim();
+    if(line){
+      drawFitText(ctx, line, padL, y, W - padL - padR, headerFont, "Arial", true);
+    }
+    y += headerLineH;
+  }
+
+  // kleiner Abstand nach Überschrift
+  if(hLines.some(l => l.trim() !== "")) y += 6;
+
+  /* ===== FREITEXT + LINIEN (Linien auch wenn leer!) ===== */
   ctx.font="20px Arial";
-  const lh=34;
-  text.split("\n").forEach(line=>{
-    ctx.fillText(line,14,y);
-    ctx.beginPath();
-    ctx.moveTo(8,y+lh-6);
-    ctx.lineTo(W-8,y+lh-6);
-    ctx.stroke();
-    y+=lh;
-  });
+  ctx.textBaseline="top";
+  ctx.textAlign="left";
 
+  const rows = (text || "").split("\n");
+  const usable = (H - padB - numberArea) - y;
+  const maxLines = Math.floor(usable / lineHeight);
+
+  for(let i=0;i<maxLines;i++){
+    const row = (rows[i] || "").trimEnd();
+
+    if(row){
+      // Text automatisch passend machen
+      drawFitText(ctx, row, padL, y, W - padL - padR, 20, "Arial", false);
+    }
+
+    // Linie
+    const yy = y + lineHeight - lineGap;
+    ctx.beginPath();
+    ctx.moveTo(padL, yy);
+    ctx.lineTo(W - padR, yy);
+    ctx.stroke();
+
+    y += lineHeight;
+  }
+
+  /* ===== NUMMER UNTEN ===== */
   if(number){
     ctx.font="bold 22px Arial";
     ctx.textAlign="center";
-    ctx.fillText(number,W/2,H-26);
+    ctx.textBaseline="bottom";
+    ctx.fillText(number, W/2, H - 8);
   }
-
-  ctx.restore();
 }
 
-const mm=v=>v*2.83465;
+// mm → pt
+const mm = v => v * 2.83465;
 
+/* ===== PDF – feste Position pro Etikett (i-1) ===== */
 async function makePDF(){
-  const pdf=await PDFLib.PDFDocument.create();
-  const page=pdf.addPage([595,842]);
-  const left=(210-192)/2;
-  const top=(297-4*61)/2;
+  const pdf = await PDFLib.PDFDocument.create();
+  const page = pdf.addPage([595,842]);
+
+  const left = (210-192)/2;
+  const top  = (297 - LABELS*61)/2;
 
   for(let i=1;i<=LABELS;i++){
     if(!document.getElementById("p"+i).checked) continue;
-    const img=await pdf.embedPng(document.getElementById("c"+i).toDataURL());
+
+    const canvas = document.getElementById("c"+i);
+    const img = await pdf.embedPng(canvas.toDataURL("image/png"));
+
+    const slot = i - 1; // feste Position
+
     page.drawImage(img,{
-      x:mm(left),
-      y:842-mm(top+(i)*61),
-      width:mm(192),
-      height:mm(61)
+      x: mm(left),
+      y: 842 - mm(top + (slot + 1) * 61),
+      width: mm(192),
+      height: mm(61)
     });
   }
 
-  const blob=new Blob([await pdf.save()],{type:"application/pdf"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="etiketten_192x61.pdf";
+  const bytes = await pdf.save();
+  const blob = new Blob([bytes],{type:"application/pdf"});
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "Etiketten_192x61.pdf";
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
 }
 </script>
+
 </body>
 </html>
