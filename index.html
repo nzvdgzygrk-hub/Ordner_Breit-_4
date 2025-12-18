@@ -1,9 +1,9 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Etiketten 192 × 61 mm</title>
+<title>Ordner-Etiketten 38 × 192 mm</title>
 
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 
@@ -64,7 +64,7 @@ button{
 
 .preview{
   width:192mm;
-  height:61mm;
+  height:38mm;
   border:1px dashed #999;
   margin-bottom:6px;
   background:#fff;
@@ -72,7 +72,7 @@ button{
 
 canvas{
   width:192mm;
-  height:61mm;
+  height:38mm;
 }
 
 input, textarea{
@@ -86,7 +86,7 @@ input, textarea{
 }
 
 textarea{
-  min-height:110px;
+  min-height:90px;
   resize:vertical;
   white-space:pre;
 }
@@ -105,7 +105,7 @@ textarea{
 </div>
 
 <script>
-const LABELS = 4;                 // Top Stick: 4 Etiketten pro Blatt
+const LABELS = 7;
 const grid = document.getElementById("grid");
 
 // UI
@@ -113,12 +113,12 @@ for(let i=1;i<=LABELS;i++){
   grid.insertAdjacentHTML("beforeend",`
     <div class="card">
       <div class="cardHeader">
-        <strong>ETIKETT ${i}</strong>
+        <strong>ORDNER ${i}</strong>
         <label>Drucken <input type="checkbox" id="p${i}" checked></label>
       </div>
 
       <div class="preview">
-        <canvas id="c${i}" width="1152" height="366"></canvas>
+        <canvas id="c${i}" width="1152" height="228"></canvas>
       </div>
 
       <textarea id="h${i}" placeholder="Überschrift (max. 3 Zeilen, ENTER)" oninput="update(${i})"></textarea>
@@ -141,9 +141,7 @@ function resetAll(){
 }
 
 function update(i){
-  const canvas = document.getElementById("c"+i);
-  const ctx = canvas.getContext("2d");
-
+  const ctx = document.getElementById("c"+i).getContext("2d");
   drawLabel(
     ctx,
     document.getElementById("h"+i).value,
@@ -152,20 +150,7 @@ function update(i){
   );
 }
 
-/* ===== Helper: Text automatisch kleiner machen, damit er reinpasst ===== */
-function drawFitText(ctx, text, x, y, maxWidth, fontBasePx, fontFamily, bold=false){
-  let size = fontBasePx;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  while(size >= 10){
-    ctx.font = `${bold ? "bold " : ""}${size}px ${fontFamily}`;
-    if(ctx.measureText(text).width <= maxWidth) break;
-    size--;
-  }
-  ctx.fillText(text, x, y);
-}
-
-/* ================= ZEICHNEN (OHNE ROTATION!) ================= */
+/* ================= ZEICHNEN ================= */
 function drawLabel(ctx, header, text, number){
   const W = ctx.canvas.width;
   const H = ctx.canvas.height;
@@ -177,57 +162,54 @@ function drawLabel(ctx, header, text, number){
   ctx.fillStyle="#000";
   ctx.strokeStyle="#000";
   ctx.lineWidth = 2;
+  ctx.textBaseline="top";
+  ctx.textAlign="left";
+
+  ctx.save();
+  ctx.translate(0, H);
+  ctx.rotate(-Math.PI/2);
 
   const padL = 20;
   const padR = 20;
   const padT = 18;
   const padB = 18;
-
-  const numberArea = 34;     // Platz unten für Nummer
-  const headerMaxLines = 3;
-  const headerLineH = 30;
-  const headerFont = 28;
-
+  const numberArea = 34;
   const lineHeight = 34;
-  const lineGap = 6;
+  const lineGap = 10;
 
   let y = padT;
 
-  /* ===== ÜBERSCHRIFT max 3 Zeilen (ENTER) ===== */
-  const hLines = (header || "").split("\n").slice(0, headerMaxLines);
-  for(let i=0;i<hLines.length;i++){
-    const line = hLines[i].trim();
-    if(line){
-      drawFitText(ctx, line, padL, y, W - padL - padR, headerFont, "Arial", true);
+  /* ===== ÜBERSCHRIFT (max 3 Zeilen) ===== */
+  ctx.font="bold 28px Arial";
+  const headerLines = (header || "").split("\n").slice(0,3);
+
+  for(const line of headerLines){
+    if(line.trim()){
+      ctx.fillText(line, padL, y);
     }
-    y += headerLineH;
+    y += 32;
   }
 
-  // kleiner Abstand nach Überschrift
-  if(hLines.some(l => l.trim() !== "")) y += 6;
+  if(headerLines.length) y += 6;
 
-  /* ===== FREITEXT + LINIEN (Linien auch wenn leer!) ===== */
+  /* ===== LINIEN + TEXT ===== */
   ctx.font="20px Arial";
-  ctx.textBaseline="top";
-  ctx.textAlign="left";
+  const textLines = (text || "").split("\n");
 
-  const rows = (text || "").split("\n");
-  const usable = (H - padB - numberArea) - y;
-  const maxLines = Math.floor(usable / lineHeight);
+  const lineEndY = W - padB - numberArea;
+  const maxLines = Math.floor((lineEndY - y) / lineHeight);
 
   for(let i=0;i<maxLines;i++){
-    const row = (rows[i] || "").trimEnd();
+    const textY = y;
+    const lineY = y + lineHeight - lineGap;
 
-    if(row){
-      // Text automatisch passend machen
-      drawFitText(ctx, row, padL, y, W - padL - padR, 20, "Arial", false);
+    if(textLines[i]){
+      ctx.fillText(textLines[i], padL, textY);
     }
 
-    // Linie
-    const yy = y + lineHeight - lineGap;
     ctx.beginPath();
-    ctx.moveTo(padL, yy);
-    ctx.lineTo(W - padR, yy);
+    ctx.moveTo(padL, lineY);
+    ctx.lineTo(H - padR, lineY);
     ctx.stroke();
 
     y += lineHeight;
@@ -238,20 +220,22 @@ function drawLabel(ctx, header, text, number){
     ctx.font="bold 22px Arial";
     ctx.textAlign="center";
     ctx.textBaseline="bottom";
-    ctx.fillText(number, W/2, H - 8);
+    ctx.fillText(number, H/2, W - 6);
   }
+
+  ctx.restore();
 }
 
 // mm → pt
 const mm = v => v * 2.83465;
 
-/* ===== PDF – feste Position pro Etikett (i-1) ===== */
+// PDF – feste Position je Ordner
 async function makePDF(){
   const pdf = await PDFLib.PDFDocument.create();
   const page = pdf.addPage([595,842]);
 
   const left = (210-192)/2;
-  const top  = (297 - LABELS*61)/2;
+  const top  = (297-7*38)/2;
 
   for(let i=1;i<=LABELS;i++){
     if(!document.getElementById("p"+i).checked) continue;
@@ -259,13 +243,13 @@ async function makePDF(){
     const canvas = document.getElementById("c"+i);
     const img = await pdf.embedPng(canvas.toDataURL("image/png"));
 
-    const slot = i - 1; // feste Position
+    const slot = i - 1;
 
     page.drawImage(img,{
       x: mm(left),
-      y: 842 - mm(top + (slot + 1) * 61),
+      y: 842 - mm(top + (slot + 1) * 38),
       width: mm(192),
-      height: mm(61)
+      height: mm(38)
     });
   }
 
@@ -275,7 +259,7 @@ async function makePDF(){
 
   const a = document.createElement("a");
   a.href = url;
-  a.download = "Etiketten_192x61.pdf";
+  a.download = "Ordneretiketten_38x192.pdf";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
