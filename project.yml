@@ -12,9 +12,10 @@ targets:
       - path: ios-native/OrdnerBreit
         excludes:
           - Assets.xcassets
-    resources:
       - path: index.html
+        buildPhase: resources
       - path: ios-native/OrdnerBreit/Assets.xcassets
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: de.fatih.ordnerbreit
